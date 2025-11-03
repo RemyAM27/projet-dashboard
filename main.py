@@ -11,7 +11,10 @@ from src.pages.carte_choroplethe import layout as carte_layout
 from src.pages.histogramme import histogramme_layout
 
 
-# -------- Préparation des données (1ère exécution) --------
+# ==========================================================
+#        Préparation automatique des données au démarrage
+# ==========================================================
+
 ROOT = Path(__file__).resolve().parent
 DATA_DIR = ROOT / "data"
 DB_PATH = DATA_DIR / "accidents.sqlite"
@@ -20,6 +23,7 @@ SENTINEL = DATA_DIR / ".prepared"
 
 
 def _db_has_tables(db_file: Path) -> bool:
+    """Vérifie si la base SQLite existe et contient au moins une table."""
     if not db_file.exists() or db_file.stat().st_size == 0:
         return False
     try:
@@ -31,51 +35,82 @@ def _db_has_tables(db_file: Path) -> bool:
 
 
 def _run(cmd: list[str]) -> None:
+    """Exécute une commande Python (script interne)."""
     subprocess.run(cmd, cwd=str(ROOT), check=True)
 
 
 def ensure_data_ready() -> None:
+    """
+    Prépare les données si nécessaire :
+    - Téléchargement (get_data.py)
+    - Nettoyage (clean_data.py)
+    - Conversion en base SQLite (to_sqlite.py)
+    """
     if _db_has_tables(DB_PATH) and SENTINEL.exists():
+        print("✅ Base déjà prête — aucune préparation nécessaire.")
         return
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+    utils_dir = ROOT / "src" / "utils"
 
-    _run([sys.executable, "get_data.py"])
-    _run([sys.executable, "clean_data.py"])
+    print("⚙️  Préparation initiale des données en cours...\n")
+
+    _run([sys.executable, str(utils_dir / "get_data.py")])
+    _run([sys.executable, str(utils_dir / "clean_data.py")])
     _run([
-        sys.executable, "to_sqlite.py",
+        sys.executable, str(utils_dir / "to_sqlite.py"),
         "--input", str(CLEANED_DIR),
         "--db", str(DB_PATH),
-        "--overwrite"
+        "--overwrite",
     ])
 
-    SENTINEL.write_text("ok", encoding="utf-8")
+    SENTINEL.write_text(
+        "Données préparées automatiquement par main.py\n"
+        "Les scripts src/utils/get_data.py, src/utils/clean_data.py et src/utils/to_sqlite.py ont été exécutés avec succès.\n"
+        "Supprimez ce fichier si vous souhaitez forcer une régénération complète.\n",
+        encoding="utf-8",
+    )
+
+    print("✅ Préparation terminée — la base SQLite est prête.\n")
 
 
-# Lance la préparation avant de construire l'app
+# Lance la préparation avant de construire l'application Dash
 ensure_data_ready()
 
 
-# ----------------------- Dash app -------------------------
+# ==========================================================
+#                      Application Dash
+# ==========================================================
+
 external_stylesheets = [dbc.themes.BOOTSTRAP]
-app = dash.Dash(__name__, external_stylesheets=external_stylesheets, suppress_callback_exceptions=True)
+app = dash.Dash(
+    __name__,
+    external_stylesheets=external_stylesheets,
+    suppress_callback_exceptions=True,
+)
 app.title = "Dashboard - Accidents (SQLite)"
+
 
 app.layout = dbc.Container(
     [
+        # ---- Titre principal ----
         html.H3(
             "Dashboard – Accidents de la route (2024)",
             className="mt-3 mb-4 text-center",
             style={"color": "#b91c1c"},
         ),
 
+        # ---- Disposition principale : carte + histogramme ----
         dbc.Row(
             [
+                # Colonne gauche : carte + filtres + légende
                 dbc.Col(
                     html.Div(carte_layout(app)),
                     width=8,
                     style={"paddingRight": "10px"},
                 ),
+
+                # Colonne droite : histogramme
                 dbc.Col(
                     html.Div(
                         histogramme_layout(app),
@@ -96,10 +131,15 @@ app.layout = dbc.Container(
             className="g-0",
         ),
 
-        html.Br(), html.Br(),
+        html.Br(),
+        html.Br(),
     ],
     fluid=True,
 )
 
+
+# ==========================================================
+#                         Lancement
+# ==========================================================
 if __name__ == "__main__":
     app.run(debug=True)
