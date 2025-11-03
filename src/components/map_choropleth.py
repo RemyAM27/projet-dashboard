@@ -83,7 +83,10 @@ def build_map_figure(
     selected_codes: List[str] | None = None,
 ) -> go.Figure:
     """Construit la figure mapbox avec catégories discrètes + contours nets."""
-    sel = set(map(str, (selected_codes or CLASS_CODE_ORDER)))
+    if selected_codes is None:
+        sel = set(CLASS_CODE_ORDER)
+    else :
+        sel = set(map(str, selected_codes))
     def _code_to_key(c): return CODE_TO_KEY.get(c, c)
     data = depc.copy()
     data["visible_label"] = data["classe_code"].apply(lambda c: _code_to_key(c) if str(c) in sel else "_DIM_")
