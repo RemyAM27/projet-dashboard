@@ -1,10 +1,13 @@
-# main.py
-# Fichier principal du projet
+import dash
+import dash_bootstrap_components as dbc
+from src.pages.carte_choroplethe import layout
 
-from get_data import download_csv_files
+
+external_stylesheets = [dbc.themes.BOOTSTRAP]
+app = dash.Dash(__name__, external_stylesheets=external_stylesheets, suppress_callback_exceptions=True)
+app.title = "Dashboard - Accidents (SQLite)"
+
+app.layout = layout(app)
 
 if __name__ == "__main__":
-    print("=== Projet Dashboard ===")
-    print("Téléchargement des données...")
-    download_csv_files()
-    print("Données prêtes dans data/raw/")
+    app.run(debug=True)   # Dash v3

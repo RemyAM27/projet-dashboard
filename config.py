@@ -1,7 +1,5 @@
-# config.py
 from pathlib import Path
 
-BASE_DIR = Path(__file__).parent
-DATA_DIR = BASE_DIR / "data"
-DB_PATH = DATA_DIR / "accidents.sqlite"
-DEPT_GEOJSON = DATA_DIR / "geo" / "departements.geojson"
+BASE_DIR = Path(__file__).parent.resolve()
+DB_PATH = BASE_DIR / "data" / "accidents.sqlite"
+DEPT_GEOJSON = BASE_DIR / "data" / "geo" / "departements.geojson"
