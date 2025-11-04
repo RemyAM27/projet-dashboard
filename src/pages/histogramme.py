@@ -1,3 +1,5 @@
+# src/pages/histogramme.py — final (niveau ESIEE)
+from __future__ import annotations
 import sqlite3
 from pathlib import Path
 from typing import List, Optional
@@ -15,106 +17,42 @@ try:
 except Exception:
     DB_FILE = Path("data/accidents.sqlite")
 
+YEAR = 2024  # année d'étude
 
-
-
-def _split_single_column(df_raw: pd.DataFrame) -> pd.DataFrame:
-    col = df_raw.columns[0]
-    df = df_raw[col].astype(str).str.split(",", expand=True)
-    df = df.apply(lambda s: s.str.strip().str.strip('"').str.strip("'"))
-    first = df.iloc[0].str.lower().tolist()
-    if any(("num" in v and "acc" in v) or "catu" in v or "grav" in v or "an_nais" in v for v in first):
-        df.columns = [v.strip() for v in df.iloc[0]]
-        df = df.iloc[1:].reset_index(drop=True)
-    else:
-        df.columns = [f"c{i}" for i in range(df.shape[1])]
-    return df
-
-
-
-
-def _guess_an_nais(df: pd.DataFrame) -> Optional[str]:
-    best, score = None, -1
-    for c in df.columns:
-        s = pd.to_numeric(df[c], errors="coerce")
-        sc = ((s >= 1900) & (s <= 2010)).sum()
-        if sc > score:
-            best, score = c, sc
-    return best
-
-
-
-
-def _guess_catu(df: pd.DataFrame) -> Optional[str]:
-    best, score = None, -1
-    for c in df.columns:
-        s = pd.to_numeric(df[c], errors="coerce")
-        sc = s.isin([1, 2, 3]).sum()
-        if sc > score:
-            best, score = c, sc
-    return best
-
-
-
-
-def _guess_grav(df: pd.DataFrame) -> Optional[str]:
-    best, score = None, -1
-    for c in df.columns:
-        s = pd.to_numeric(df[c], errors="coerce")
-        sc = s.isin([1, 2, 3, 4]).sum()
-        if sc > score:
-            best, score = c, sc
-    return best
-
-
-
-
-def load_age_base(year: int = 2024) -> pd.DataFrame:
+# --------------------- Lecture base ---------------------
+def load_age_base(year: int = YEAR) -> pd.DataFrame:
+    """
+    Lit directement SQLite :
+      - usagers(num_acc, catu, grav, an_nais)
+      - caracteristiques(an) pour filtrer sur l'année.
+    Retourne un DF avec colonnes: age, catu, grav.
+    """
     if not DB_FILE.exists():
         return pd.DataFrame(columns=["age", "catu", "grav"])
 
-
+    sql = """
+        SELECT u.an_nais, u.catu, u.grav
+        FROM usagers u
+        JOIN caracteristiques c ON c.num_acc = u.num_acc
+        WHERE c.an = ?
+    """
     with sqlite3.connect(DB_FILE) as conn:
-        df_u = pd.read_sql_query("SELECT * FROM usagers", conn)
+        df = pd.read_sql_query(sql, conn, params=[year])
 
+    # calcul d'âge simple
+    an_nais = pd.to_numeric(df.get("an_nais"), errors="coerce")
+    age = year - an_nais
 
-    if df_u.shape[1] == 1:
-        df_u = _split_single_column(df_u)
+    out = pd.DataFrame({
+        "age": age,
+        "catu": pd.to_numeric(df.get("catu"), errors="coerce"),
+        "grav": pd.to_numeric(df.get("grav"), errors="coerce"),
+    })
+    # bornes plausibles d'âge
+    out = out[(out["age"] >= 0) & (out["age"] <= 100)]
+    return out.reset_index(drop=True)
 
-
-    # colonnes exactes si dispo
-    cols_lower = {c.lower(): c for c in df_u.columns}
-    an_nais_col = cols_lower.get("an_nais")
-    catu_col = cols_lower.get("catu")
-    grav_col = cols_lower.get("grav")
-
-
-    # sinon heuristiques
-    if an_nais_col is None:
-        an_nais_col = _guess_an_nais(df_u)
-    if catu_col is None:
-        catu_col = _guess_catu(df_u)
-    if grav_col is None:
-        grav_col = _guess_grav(df_u)
-
-
-    out = pd.DataFrame()
-
-
-    if an_nais_col is not None:
-        an_nais = pd.to_numeric(df_u[an_nais_col], errors="coerce")
-        out["age"] = year - an_nais
-    else:
-        out["age"] = pd.NA
-
-
-    out["catu"] = pd.to_numeric(df_u[catu_col], errors="coerce") if catu_col else pd.NA
-    out["grav"] = pd.to_numeric(df_u[grav_col], errors="coerce") if grav_col else pd.NA
-    return out[["age", "catu", "grav"]]
-
-
-
-
+# --------------------- Préparation histogramme ---------------------
 def make_age_histogram(df: pd.DataFrame, min_age: int = 0) -> pd.DataFrame:
     ages = pd.to_numeric(df.get("age", pd.Series(dtype="float64")), errors="coerce")
     ages = ages[(ages >= min_age) & (ages <= 100)]
@@ -125,9 +63,6 @@ def make_age_histogram(df: pd.DataFrame, min_age: int = 0) -> pd.DataFrame:
     counts.columns = ["Tranche d'âge", "Nombre d'accidents"]
     return counts
 
-
-
-
 def build_hist_figure(df_hist: pd.DataFrame, y_label: str, hover_label: str):
     fig = px.bar(
         df_hist,
@@ -136,19 +71,18 @@ def build_hist_figure(df_hist: pd.DataFrame, y_label: str, hover_label: str):
         labels={"Tranche d'âge": "Âge", "Nombre d'accidents": y_label},
     )
     fig.update_traces(hovertemplate=f"%{{x}} ans<br>{hover_label} : %{{y:,}}")
-    fig.update_layout(plot_bgcolor="white", paper_bgcolor="white", bargap=0, margin=dict(l=30, r=30, t=40, b=40))
+    fig.update_layout(plot_bgcolor="white", paper_bgcolor="white", bargap=0,
+                      margin=dict(l=30, r=30, t=40, b=40))
     fig.update_xaxes(showgrid=False)
-    fig.update_yaxes(showgrid=True, gridcolor="#e5e7eb", zeroline=True, rangemode="tozero", tickformat=",d")
+    fig.update_yaxes(showgrid=True, gridcolor="#e5e7eb", zeroline=True,
+                     rangemode="tozero", tickformat=",d")
     return fig
 
-
-
-
+# --------------------- Layout + Callback ---------------------
 def histogramme_layout(app: dash.Dash):
-    base = load_age_base(2024)
-    init = base[base["catu"] == 1] if "catu" in base.columns and base["catu"].notna().any() else base
+    base = load_age_base(YEAR)
+    init = base[base["catu"] == 1] if "catu" in base.columns else base
     df_hist = make_age_histogram(init, min_age=14)
-
 
     dropdown = html.Div(
         dcc.Dropdown(
@@ -165,53 +99,44 @@ def histogramme_layout(app: dash.Dash):
         style={"maxWidth": "420px", "margin": "0 auto 10px auto"},
     )
 
-
-    graph = dcc.Loading(
-        type="default",
-        children=dcc.Graph(
-            id="hist-age-graph",
-            figure=build_hist_figure(df_hist, "Nombre d'accidents", "accidents"),
-            config={"displayModeBar": False},
-            style={"height": "440px"},
-        ),
+    graph = dcc.Graph(
+        id="hist-age-graph",
+        figure=build_hist_figure(df_hist, "Nombre d'accidents", "accidents"),
+        config={"displayModeBar": False},
+        style={"height": "440px"},
     )
 
 
     return html.Div(
         [
-            html.H4("Histogramme des accidents par âge", style={"textAlign": "center", "color": "#2c3e50", "fontWeight": 600, "marginBottom": "10px"}),
+            html.H4(
+                "Histogramme des accidents par âge",
+                style={"textAlign": "center", "color": "#2c3e50", "fontWeight": 600, "marginBottom": "10px"},
+            ),
             dropdown,
             html.Div(graph, style={"maxWidth": "1000px", "margin": "0 auto"}),
         ]
     )
-
-
-
 
 @dash.callback(
     Output("hist-age-graph", "figure"),
     Input("hist-population", "value"),
 )
 def update_histogram(pop: str):
-    df = load_age_base(2024)
+    df = load_age_base(YEAR)
     pop = (pop or "").lower()
 
-
-    if pop == "conducteurs" and "catu" in df.columns and df["catu"].notna().any():
+    if pop == "conducteurs":
         df = df[df["catu"] == 1]
         y_label, hover = "Nombre d'accidents", "accidents"
-    elif pop == "occupants" and "catu" in df.columns and df["catu"].notna().any():
+    elif pop == "occupants":
         df = df[df["catu"].isin([1, 2])]
         y_label, hover = "Nombre d'accidents", "accidents"
-    elif pop == "decedes" and "grav" in df.columns and df["grav"].notna().any():
+    elif pop == "decedes":
         df = df[df["grav"] == 2]
         y_label, hover = "Nombre de décès", "victimes"
     else:
         y_label, hover = "Nombre d'accidents", "accidents"
 
-
     df_hist = make_age_histogram(df, min_age=14)
     return build_hist_figure(df_hist, y_label, hover)
-
-
-

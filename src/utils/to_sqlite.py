@@ -1,7 +1,8 @@
 """
-Ce script convertit les fichiers CSV des accidents corporels
-en une base SQLite. Il peut traiter un ou plusieurs fichiers,
-ou un dossier complet contenant les CSV.
+Conversion CSV nettoyés -> base SQLite utilisée par le dashboard.
+Lit les fichiers de data/cleaned et crée les tables:
+- caracteristiques, lieux, vehicules (import direct)
+- usagers (schema propre: num_acc, catu, grav)
 """
 
 import argparse
@@ -10,10 +11,13 @@ import pandas as pd
 from pathlib import Path
 import re
 
-# Lecture par morceaux (gros fichiers)
-CHUNK_SIZE = 200_000
+INDEXES = {
+    "caracteristiques": ["num_acc", "an", "mois", "dep"],
+    "lieux": ["num_acc", "catr", "circ"],
+    "vehicules": ["num_acc", "num_veh", "catv"],
+    "usagers": ["num_acc", "catu", "grav", "an_nais"],
+}
 
-# Correspondance nom de fichier -> table
 ALIASES = {
     "caracteristiques": "caracteristiques",
     "caract": "caracteristiques",
@@ -23,16 +27,7 @@ ALIASES = {
     "veh": "vehicules",
 }
 
-# Index utiles pour le dashboard
-INDEXES = {
-    "caracteristiques": ["Num_Acc", "an", "mois", "dep"],
-    "lieux": ["Num_Acc", "catr", "circ"],
-    "vehicules": ["Num_Acc", "num_veh", "catv"],
-    "usagers": ["Num_Acc", "num_veh", "grav"],
-}
-
 def guess_table_name(path: Path) -> str:
-    """Nom de table à partir du nom de fichier."""
     stem = path.stem.lower()
     for k, v in ALIASES.items():
         if k in stem:
@@ -40,125 +35,87 @@ def guess_table_name(path: Path) -> str:
     name = re.sub(r"[^a-z0-9_]+", "_", stem)
     return re.sub(r"_+", "_", name).strip("_")
 
-def list_csv(inputs):
-    """Liste des CSV à traiter."""
-    paths = []
-    for item in inputs:
-        p = Path(item)
-        if p.is_dir():
-            paths += sorted([f for f in p.iterdir() if f.suffix.lower() == ".csv"])
-        elif p.is_file() and p.suffix.lower() == ".csv":
-            paths.append(p)
-    if not paths:
-        raise FileNotFoundError("Aucun fichier CSV trouvé.")
-    return paths
-
 def connect_sqlite(db_path: Path) -> sqlite3.Connection:
-    """Connexion SQLite (quelques réglages pour l'import)."""
     conn = sqlite3.connect(db_path)
     conn.execute("PRAGMA journal_mode=OFF;")
     conn.execute("PRAGMA synchronous=OFF;")
     return conn
 
-def ensure_table(conn, table, columns):
-    """Crée la table si absente (colonnes TEXT pour robustesse)."""
-    cols_sql = ", ".join(f'"{c}" TEXT' for c in columns)
-    conn.execute(f'CREATE TABLE IF NOT EXISTS "{table}" ({cols_sql});')
+def _harmonize_cols(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    df.columns = [c.strip().lower() for c in df.columns]
+    if "num_acc" not in df.columns:
+        for c in df.columns:
+            if c.replace("_", "").lower() == "numacc":
+                df = df.rename(columns={c: "num_acc"})
+                break
+    return df
 
-def _append_chunk(conn, table: str, chunk: pd.DataFrame):
-    """Insertion robuste : sous-batches pour éviter 'too many SQL variables'."""
-    ncols = max(1, len(chunk.columns))
-    # Limite SQLite ~999 variables → marge 900
-    max_rows = max(1, 900 // ncols)
-    chunk.to_sql(
-        table, conn,
-        if_exists="append",
-        index=False,
-        method="multi",
-        chunksize=max_rows
-    )
+def import_table(conn, csv_path: Path, table: str):
+    print(f"[+] Import de {csv_path.name} -> '{table}'")
+    df = pd.read_csv(csv_path, sep=None, engine="python")
+    df = _harmonize_cols(df)
 
-def import_csv(conn, csv_path: Path, table: str):
-    """Lit le CSV en chunks et insère dans SQLite.
-    Teste plusieurs séparateurs; en dernier recours, saute les lignes invalides.
-    """
-    attempts = [
-        {"sep": ";", "engine": "python"},
-        {"sep": ",", "engine": "python"},
-        {"sep": None, "engine": "python"},  # détection auto
-        {"sep": "\t", "engine": "python"},
-    ]
+    if table == "usagers":
+        # <-- GARDE an_nais
+        keep = [x for x in ["num_acc", "catu", "grav", "an_nais"] if x in df.columns]
+        df = df[keep].copy()
 
-    first_chunk = True
-    for opts in attempts:
-        try:
-            reader = pd.read_csv(
-                csv_path,
-                dtype=str,
-                chunksize=CHUNK_SIZE,
-                encoding_errors="ignore",
-                **opts
-            )
-            for chunk in reader:
-                chunk.columns = [str(c).strip() for c in chunk.columns]
-                if first_chunk:
-                    ensure_table(conn, table, list(chunk.columns))
-                    first_chunk = False
-                _append_chunk(conn, table, chunk)
-            print(f"    → OK avec sep={opts['sep'] if opts['sep'] is not None else 'auto'}")
-            return
-        except Exception:
-            # on essaie l'option suivante
-            continue
+        df["num_acc"] = pd.to_numeric(df.get("num_acc"), errors="coerce")
+        df["catu"]    = pd.to_numeric(df.get("catu"),    errors="coerce")
+        df["grav"]    = pd.to_numeric(df.get("grav"),    errors="coerce")
+        df["an_nais"] = pd.to_numeric(df.get("an_nais"), errors="coerce")
 
-    # Dernier recours : ignorer uniquement les lignes mal formées
-    print("    ! Lignes mal formées détectées, on les saute (on_bad_lines='skip').")
-    reader = pd.read_csv(
-        csv_path,
-        dtype=str,
-        chunksize=CHUNK_SIZE,
-        engine="python",
-        sep=None,                # auto
-        on_bad_lines="skip",     # pandas >= 1.4
-        encoding_errors="ignore",
-    )
-    first_chunk = True
-    for chunk in reader:
-        chunk.columns = [str(c).strip() for c in chunk.columns]
-        if first_chunk:
-            ensure_table(conn, table, list(chunk.columns))
-            first_chunk = False
-        _append_chunk(conn, table, chunk)
+        df = df.dropna(subset=["num_acc"]).astype({"num_acc": "int64"})
 
-def create_indexes(conn, table: str):
-    """Index simples pour accélérer les recherches."""
+        conn.execute("DROP TABLE IF EXISTS usagers;")
+        conn.execute("""
+            CREATE TABLE usagers (
+                num_acc INTEGER NOT NULL,
+                catu    INTEGER,
+                grav    INTEGER,
+                an_nais INTEGER
+            );
+        """)
+        df.to_sql("usagers", conn, if_exists="append", index=False)
+    else:
+        df.to_sql(table, conn, if_exists="replace", index=False)
+
     for col in INDEXES.get(table, []):
         try:
-            conn.execute(f'CREATE INDEX IF NOT EXISTS idx_{table}_{col} ON {table}({col});')
-        except sqlite3.Error:
+            conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table}_{col} ON {table}({col});")
+        except Exception:
             pass
 
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Conversion CSV -> SQLite (accidents)")
-    parser.add_argument("--input", nargs="+", required=True,
-                        help="Chemin(s) des fichiers ou dossier contenant les CSV.")
-    parser.add_argument("--db", required=True, help="Chemin du fichier .sqlite à créer.")
-    parser.add_argument("--overwrite", action="store_true", help="Écrase la base existante.")
-    args = parser.parse_args()
+    p = argparse.ArgumentParser(description="CSV nettoyés -> SQLite (accidents)")
+    p.add_argument("--input", nargs="+", required=True, help="Fichiers/dossiers CSV (ex: data/cleaned)")
+    p.add_argument("--db", required=True, help="Chemin du .sqlite à créer")
+    p.add_argument("--overwrite", action="store_true", help="Écrase la base existante")
+    args = p.parse_args()
 
     db_path = Path(args.db)
     if db_path.exists() and args.overwrite:
         db_path.unlink()
 
-    conn = connect_sqlite(db_path)
-    csv_files = list_csv(args.input)
+    # liste des CSV
+    csvs = []
+    for item in args.input:
+        pth = Path(item)
+        if pth.is_dir():
+            csvs += [f for f in pth.iterdir() if f.suffix.lower()==".csv"]
+        elif pth.is_file() and pth.suffix.lower()==".csv":
+            csvs.append(pth)
+    if not csvs:
+        raise FileNotFoundError("Aucun CSV trouvé dans --input")
 
+    conn = connect_sqlite(db_path)
     try:
-        for csv in csv_files:
+        for csv in csvs:
             table = guess_table_name(csv)
-            print(f"[+] Import de {csv.name} → table '{table}'")
-            import_csv(conn, csv, table)
-            create_indexes(conn, table)
+            import_table(conn, csv, table)
         conn.execute("ANALYZE;")
         conn.execute("VACUUM;")
         print(f"[OK] Base créée : {db_path}")

@@ -14,7 +14,7 @@ from ..components.map_choropleth import (
 # Réglages
 MAP_BLOCK_H = "72vh"
 FR_CENTER = {"lat": 46.4, "lon": 2.0}
-MAP_INIT_ZOOM = 4.75
+MAP_INIT_ZOOM = 4.5
 
 
 def _fmt(n):
