@@ -8,6 +8,18 @@ data/cleaned/*
 !data/raw/.gitkeep
 !data/cleaned/.gitkeep
 *.db
+*.sqlite
 
 # VS Code
 .vscode/
+
+# --- Data : ignorer le contenu mais garder les dossiers ---
+# raw
+data/raw/*
+!data/raw/
+!data/raw/.gitkeep
+
+# cleaned
+data/cleaned/*
+!data/cleaned/
+!data/cleaned/.gitkeep

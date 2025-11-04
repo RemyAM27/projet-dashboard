@@ -2,11 +2,14 @@
 from __future__ import annotations
 import sqlite3
 from pathlib import Path
+from typing import List, Optional
+
 
 import pandas as pd
 import dash
 from dash import html, dcc, Input, Output
 import plotly.express as px
+
 
 try:
     from config import DB_PATH
@@ -102,6 +105,7 @@ def histogramme_layout(app: dash.Dash):
         config={"displayModeBar": False},
         style={"height": "440px"},
     )
+
 
     return html.Div(
         [
