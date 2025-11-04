@@ -2,14 +2,20 @@
 .venv/
 __pycache__/
 
-# Données locales
-data/raw/
-data/cleaned/
+# Bases locales
 *.db
-
-# Garder les dossiers visibles sur GitHub
-!data/raw/.gitkeep
-!data/cleaned/.gitkeep
+*.sqlite
 
 # VS Code
 .vscode/
+
+# --- Data : ignorer le contenu mais garder les dossiers ---
+# raw
+data/raw/*
+!data/raw/
+!data/raw/.gitkeep
+
+# cleaned
+data/cleaned/*
+!data/cleaned/
+!data/cleaned/.gitkeep
