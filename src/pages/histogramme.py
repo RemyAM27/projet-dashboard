@@ -111,7 +111,7 @@ def histogramme_layout(app: dash.Dash):
     init = base[base["catu"] == 1] if "catu" in base.columns and base["catu"].notna().any() else base
     df_hist = _make_hist(init, min_age=14)
 
-    controls = html.Div(
+    dropdown = html.Div(
         dcc.Dropdown(
             id="hist-population",
             options=[
@@ -124,17 +124,22 @@ def histogramme_layout(app: dash.Dash):
         style={"maxWidth": "420px", "margin": "0 auto 10px auto"},
     )
 
-    graph = dcc.Graph(
-        id="hist-age-graph",
-        figure=_build_fig(df_hist, "Nombre d'accidents", "accidents"),
-        config={"displayModeBar": False},
-        style={"height": "440px"},
+    graph = dcc.Loading(
+        type="default",
+        children=dcc.Graph(
+            id="hist-age-graph",
+            figure=_build_fig(df_hist, "Nombre d'accidents", "accidents"),
+            config={"displayModeBar": False},
+            style={"height": "440px"},
+        ),
     )
 
     return html.Div(
-        [html.H4("Histogramme des accidents par âge", style={"textAlign": "center", "marginBottom": "10px"}),
-         controls,
-         html.Div(graph, style={"maxWidth": "1000px", "margin": "0 auto"})]
+        [
+            html.H4("Histogramme des accidents par âge", style={"textAlign": "center", "marginBottom": "10px"}),
+            dropdown,
+            html.Div(graph, style={"maxWidth": "1000px", "margin": "0 auto"}),
+        ]
     )
 
 
@@ -142,7 +147,7 @@ def histogramme_layout(app: dash.Dash):
     Output("hist-age-graph", "figure"),
     Input("hist-population", "value"),
 )
-def _update_hist(pop: str):
+def update_histogram(pop: str):
     df = load_age_base(2024)
     pop = (pop or "").lower()
 
@@ -163,4 +168,5 @@ def _update_hist(pop: str):
         min_age = 0
 
     return _build_fig(_make_hist(df, min_age), y_label, hover)
+
 
