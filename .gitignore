@@ -3,8 +3,10 @@
 __pycache__/
 
 # Données locales
-data/raw/
-data/cleaned/
+data/raw/*
+data/cleaned/*
+!data/raw/.gitkeep
+!data/cleaned/.gitkeep
 *.db
 
 # VS Code
