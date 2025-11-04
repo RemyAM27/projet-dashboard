@@ -9,7 +9,7 @@ import dash_bootstrap_components as dbc
 
 from src.pages.carte_choroplethe import layout as carte_layout
 from src.pages.histogramme import histogramme_layout
-
+from src.pages.donut import donut_layout   # <-- ajout
 
 # ==========================================================
 #        Préparation automatique des données au démarrage
@@ -77,7 +77,6 @@ def ensure_data_ready() -> None:
 # Lance la préparation avant de construire l'application Dash
 ensure_data_ready()
 
-
 # ==========================================================
 #                      Application Dash
 # ==========================================================
@@ -100,7 +99,7 @@ app.layout = dbc.Container(
             style={"color": "#b91c1c"},
         ),
 
-        # ---- Disposition principale : carte + histogramme ----
+        # ---- Disposition principale : carte à gauche / histogramme + donut à droite ----
         dbc.Row(
             [
                 # Colonne gauche : carte + filtres + légende
@@ -110,18 +109,35 @@ app.layout = dbc.Container(
                     style={"paddingRight": "10px"},
                 ),
 
-                # Colonne droite : histogramme
+                # Colonne droite : histogramme puis donut (empilés)
                 dbc.Col(
                     html.Div(
-                        histogramme_layout(app),
-                        style={
-                            "backgroundColor": "#ffffff",
-                            "border": "1px solid #e5e7eb",
-                            "borderRadius": "12px",
-                            "boxShadow": "0 2px 10px rgba(0,0,0,0.06)",
-                            "padding": "10px",
-                            "height": "fit-content",
-                        },
+                        [
+                            html.Div(  # carte blanche histogramme
+                                histogramme_layout(app),
+                                style={
+                                    "backgroundColor": "#ffffff",
+                                    "border": "1px solid #e5e7eb",
+                                    "borderRadius": "12px",
+                                    "boxShadow": "0 2px 10px rgba(0,0,0,0.06)",
+                                    "padding": "10px",
+                                    "height": "fit-content",
+                                },
+                            ),
+                            html.Div(style={"height": "12px"}),  # petit espace
+
+                            html.Div(  # carte blanche donut
+                                donut_layout(app),
+                                style={
+                                    "backgroundColor": "#ffffff",
+                                    "border": "1px solid #e5e7eb",
+                                    "borderRadius": "12px",
+                                    "boxShadow": "0 2px 10px rgba(0,0,0,0.06)",
+                                    "padding": "10px",
+                                    "height": "fit-content",
+                                },
+                            ),
+                        ]
                     ),
                     width=4,
                 ),
