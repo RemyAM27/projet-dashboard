@@ -75,7 +75,12 @@ def ensure_data_ready() -> None:
 
 
 # Lance la préparation avant de construire l'application Dash
-ensure_data_ready()
+try:
+    ensure_data_ready()
+except Exception as e:
+    print(" Préparation des données ignorée (erreur non bloquante) :", e)
+    print("   Lancez les scripts de src/utils si besoin, puis relancez l'app.")
+
 
 
 # ==========================================================
