@@ -57,18 +57,17 @@ def import_table(conn, csv_path: Path, table: str):
     df = _harmonize_cols(df)
 
     if table == "usagers":
-        # on garde aussi an_nais pour les histogrammes d'âge
+        # <-- GARDE an_nais
         keep = [x for x in ["num_acc", "catu", "grav", "an_nais"] if x in df.columns]
         df = df[keep].copy()
 
-        # typage simple
         df["num_acc"] = pd.to_numeric(df.get("num_acc"), errors="coerce")
         df["catu"]    = pd.to_numeric(df.get("catu"),    errors="coerce")
         df["grav"]    = pd.to_numeric(df.get("grav"),    errors="coerce")
         df["an_nais"] = pd.to_numeric(df.get("an_nais"), errors="coerce")
 
         df = df.dropna(subset=["num_acc"]).astype({"num_acc": "int64"})
-        # crée la table propre
+
         conn.execute("DROP TABLE IF EXISTS usagers;")
         conn.execute("""
             CREATE TABLE usagers (
@@ -80,15 +79,14 @@ def import_table(conn, csv_path: Path, table: str):
         """)
         df.to_sql("usagers", conn, if_exists="append", index=False)
     else:
-        # import direct pour les autres tables
         df.to_sql(table, conn, if_exists="replace", index=False)
 
-    # index utiles
     for col in INDEXES.get(table, []):
         try:
             conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table}_{col} ON {table}({col});")
         except Exception:
             pass
+
 
 
 def main():
