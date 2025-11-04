@@ -7,5 +7,9 @@ data/raw/
 data/cleaned/
 *.db
 
+# Garder les dossiers visibles sur GitHub
+!data/raw/.gitkeep
+!data/cleaned/.gitkeep
+
 # VS Code
 .vscode/

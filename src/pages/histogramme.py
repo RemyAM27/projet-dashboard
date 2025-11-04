@@ -1,4 +1,4 @@
-# src/pages/histogramme.py — v2 (corrigée, niveau ESIEE)
+# src/pages/histogramme.py 
 import sqlite3
 from pathlib import Path
 
