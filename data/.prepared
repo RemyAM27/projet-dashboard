@@ -1,3 +1,3 @@
 Données préparées automatiquement par main.py
-Les scripts src/utils/get_data.py, src/utils/clean_data.py et src/utils/to_sqlite.py ont été exécutés avec succès.
-Supprimez ce fichier si vous souhaitez forcer une régénération complète.
+Scripts exécutés : src/utils/get_data.py, src/utils/clean_data.py, src/utils/to_sqlite.py
+Supprimez ce fichier pour forcer une régénération complète.

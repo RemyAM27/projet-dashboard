@@ -11,7 +11,8 @@ import dash_bootstrap_components as dbc
 
 from src.pages.carte_choroplethe import layout as carte_layout
 from src.pages.histogramme import histogramme_layout
-from src.pages.donut import donut_layout   # <-- ajout
+from src.pages.donut import donut_layout
+from src.pages.infos_departement import infos_departement_layout  # <-- nouveau
 
 # ==========================================================
 #        Préparation automatique des données au démarrage
@@ -25,7 +26,6 @@ SENTINEL = DATA_DIR / ".prepared"
 
 
 def _db_has_tables(db_file: Path) -> bool:
-    """Vérifie si la base SQLite existe et contient au moins une table."""
     if not db_file.exists() or db_file.stat().st_size == 0:
         return False
     try:
@@ -37,22 +37,14 @@ def _db_has_tables(db_file: Path) -> bool:
 
 
 def _run(cmd: list[str]) -> None:
-    """Exécute un script Python enfant dans le dossier racine du projet."""
     subprocess.run(cmd, cwd=str(ROOT), check=True)
 
 
 def _bind_db_env(db_path: Path) -> None:
-    """Expose le chemin de la base via variable d'env (optionnel mais pratique)."""
     os.environ["ACCIDENTS_DB_PATH"] = str(db_path)
 
 
 def ensure_data_ready() -> None:
-    """
-    Prépare les données si nécessaire :
-    - Téléchargement (get_data.py)
-    - Nettoyage (clean_data.py)
-    - Conversion en base SQLite (to_sqlite.py)
-    """
     if _db_has_tables(DB_PATH) and SENTINEL.exists():
         print("✅ Base déjà prête — aucune préparation nécessaire.")
         _bind_db_env(DB_PATH)
@@ -83,7 +75,6 @@ def ensure_data_ready() -> None:
     print("✅ Préparation terminée — la base SQLite est prête.\n")
 
 
-# Lance la préparation avant de construire l'application Dash
 try:
     ensure_data_ready()
 except Exception as e:
@@ -92,18 +83,12 @@ except Exception as e:
     if DB_PATH.exists():
         _bind_db_env(DB_PATH)
 
-
 # ==========================================================
 #         Helpers spécifiques pour la courbe Jour/Nuit
 # ==========================================================
 
 def _detect_table_yearcol(conn: sqlite3.Connection) -> tuple[str, str | None]:
-    """
-    Retourne (table, col_annee) qui contient au moins 'mois' et 'lum'.
-    col_annee peut être 'an', 'annee' ou 'year', ou None si absent.
-    """
     tables = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table';")]
-    # On priorise les noms classiques des BAAC
     preferred = ["caracteristiques", "accidents", "acc", "acc_caracteristiques"]
     ordered = preferred + [t for t in tables if t not in preferred]
 
@@ -116,14 +101,7 @@ def _detect_table_yearcol(conn: sqlite3.Connection) -> tuple[str, str | None]:
 
 
 def _load_accidents_mois_lum(db_path: Path, year: int = 2024):
-    """
-    Charge uniquement les colonnes nécessaires à la page courbe :
-    - 'mois' (1..12)
-    - 'lum'  (codes BAAC)
-    Si l'année demandée est absente, on bascule sur l'année la plus récente disponible.
-    """
     import pandas as pd
-
     with sqlite3.connect(db_path) as conn:
         table, year_col = _detect_table_yearcol(conn)
 
@@ -131,33 +109,21 @@ def _load_accidents_mois_lum(db_path: Path, year: int = 2024):
             sql = f"SELECT mois, lum FROM {table} WHERE {year_col} = ?"
             df = pd.read_sql_query(sql, conn, params=(year,))
             if df.empty:
-                # Repli : dernière année dispo
                 y = pd.read_sql_query(f"SELECT MAX({year_col}) AS y FROM {table}", conn)["y"].iat[0]
                 if pd.notna(y):
                     df = pd.read_sql_query(sql, conn, params=(int(y),))
         else:
-            # Pas de colonne d'année : on prend tout
             df = pd.read_sql_query(f"SELECT mois, lum FROM {table}", conn)
 
-    # Mise en forme défensive
     for col in ("mois", "lum"):
         if col not in df.columns:
             df[col] = None
     df["mois"] = pd.to_numeric(df["mois"], errors="coerce").astype("Int64")
     df["lum"] = pd.to_numeric(df["lum"], errors="coerce").astype("Int64")
     df = df.dropna(subset=["mois", "lum"])
-
     return df
 
-
-# ==========================================================
-#              Imports des pages (après préparation)
-# ==========================================================
-from src.pages.carte_choroplethe import layout as carte_layout
-from src.pages.histogramme import histogramme_layout
-
-# On remplace la fonction utilisée dans la page 'graphiquecourbe' pour garantir
-# la présence de 'mois' et 'lum', indépendamment de l'implémentation interne.
+# On remplace la fonction utilisée dans la page 'graphiquecourbe'
 import src.pages.graphiquecourbe as courbe_page
 courbe_page.load_accidents = partial(_load_accidents_mois_lum, DB_PATH)
 graphiquecourbe_layout = courbe_page.graphiquecourbe_layout
@@ -174,30 +140,31 @@ app = dash.Dash(
 )
 app.title = "Dashboard - Accidents (SQLite)"
 
-
 app.layout = dbc.Container(
     [
-        # ---- Titre principal ----
         html.H3(
             "Dashboard – Accidents de la route (2024)",
             className="mt-3 mb-4 text-center",
             style={"color": "#b91c1c"},
         ),
 
-        # ---- Disposition principale : carte à gauche / histogramme + donut à droite ----
+        # Rangée 1 : colonne gauche (infos + carte) / colonne droite (histogramme + donut)
         dbc.Row(
             [
                 dbc.Col(
-                    html.Div(carte_layout(app)),
+                    html.Div(
+                        [
+                            infos_departement_layout(app),  # <-- panneau compact au-dessus de la carte
+                            carte_layout(app),
+                        ]
+                    ),
                     width=8,
                     style={"paddingRight": "10px"},
                 ),
-
-                # Colonne droite : histogramme puis donut (empilés)
                 dbc.Col(
                     html.Div(
                         [
-                            html.Div(  # carte blanche histogramme
+                            html.Div(
                                 histogramme_layout(app),
                                 style={
                                     "backgroundColor": "#ffffff",
@@ -208,9 +175,8 @@ app.layout = dbc.Container(
                                     "height": "fit-content",
                                 },
                             ),
-                            html.Div(style={"height": "12px"}),  # petit espace
-
-                            html.Div(  # carte blanche donut
+                            html.Div(style={"height": "12px"}),
+                            html.Div(
                                 donut_layout(app),
                                 style={
                                     "backgroundColor": "#ffffff",
@@ -231,7 +197,7 @@ app.layout = dbc.Container(
             className="g-0",
         ),
 
-        # ---- Rangée 2 : courbe Jour/Nuit (pleine largeur) ----
+        # Rangée 2 : courbe Jour/Nuit (pleine largeur)
         dbc.Row(
             [
                 dbc.Col(
@@ -257,9 +223,10 @@ app.layout = dbc.Container(
     fluid=True,
 )
 
-
 # ==========================================================
 #                         Lancement
 # ==========================================================
 if __name__ == "__main__":
     app.run(debug=True)
+
+
