@@ -12,7 +12,6 @@ def load_accidents(db_path: Path, year: int = 2024) -> pd.DataFrame:
     df = load_join_carac_lieux(db_path, year=year)
     if "dep" in df.columns:
         df["dep"] = df["dep"].astype(str).str.upper().str.strip()
-        # zero-pad pour codes numériques
         m_num = df["dep"].str.match(r"^\d+$", na=False)
         df.loc[m_num, "dep"] = df.loc[m_num, "dep"].str.zfill(2)
     if "mois" in df.columns:

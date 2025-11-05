@@ -83,7 +83,7 @@ def layout(app: dash.Dash):
         transition={"duration": 0},
     )
 
-    # Graph (hover activé, gestes bloqués)
+
     map_graph = dcc.Graph(
         id="map-accidents",
         figure=base_fig,
@@ -99,7 +99,7 @@ def layout(app: dash.Dash):
         },
     )
 
-    # Colonne de gauche (légende + filtres) — bien alignée, sans marges qui débordent
+    # Colonne de gauche (légende + filtres)
     side_panel = html.Div(
         [
             html.Div("   Echelle d’intensité", style={"textAlign": "center", "fontWeight": 600, "marginBottom": "8px"}),
@@ -133,13 +133,9 @@ def layout(app: dash.Dash):
         },
     )
 
-    # Carte et panneau côte à côte dans la même carte blanche
+
     map_card = html.Div(
         [
-            html.H5(
-                "Accidents de la route en France",
-                style={"textAlign": "center", "color": "#2c3e50", "fontWeight": 600, "marginBottom": "10px"},
-            ),
             html.Div(
                 [side_panel, html.Div(map_graph, style={"flex": "1 1 auto", "minWidth": "520px"})],
                 style={
@@ -158,10 +154,10 @@ def layout(app: dash.Dash):
             "boxShadow": "0 2px 10px rgba(0,0,0,0.06)",
             "padding": "16px",
             "width": "100%",
-            "maxWidth": "1040px",   # largeur confortable
-            "marginLeft": "0,5%",     # décale vers la gauche
+            "maxWidth": "1040px",   
+            "marginLeft": "0,5%",  
             "boxSizing": "border-box",
-            "overflow": "hidden",   # empêche tout débordement qui ferait “sauter” la bordure
+            "overflow": "hidden",  
         },
     )
 
@@ -186,7 +182,7 @@ def layout(app: dash.Dash):
     page = html.Div([global_bg, *stores, layout_row],
                     style={"backgroundColor": "#ffffff", "minHeight": "100vh", "margin": "0", "padding": "0"})
 
-    # Callback (pas de relayoutData → pas de spinner au drag)
+
     @app.callback(
         Output("map-accidents", "figure"),
         Output("classe-filter", "value"),

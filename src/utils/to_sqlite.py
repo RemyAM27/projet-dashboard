@@ -57,7 +57,6 @@ def import_table(conn, csv_path: Path, table: str):
     df = _harmonize_cols(df)
 
     if table == "usagers":
-        # <-- GARDE an_nais
         keep = [x for x in ["num_acc", "catu", "grav", "an_nais"] if x in df.columns]
         df = df[keep].copy()
 

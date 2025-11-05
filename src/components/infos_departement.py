@@ -1,4 +1,3 @@
-# src/pages/infos_departement.py
 from __future__ import annotations
 import sqlite3
 from pathlib import Path
@@ -14,7 +13,7 @@ from ..components.map_choropleth import BASE_COLOR_MAP
 
 YEAR = 2024
 
-# --------------------- Référentiels ---------------------
+
 def _codes_metropole() -> list[str]:
     """
     Liste ordonnée des départements métropolitains :
@@ -43,7 +42,7 @@ FALLBACK_NAMES = {
     "976": "Mayotte",
 }
 
-# --------------------- Normalisation des codes ---------------------
+
 def _normalize_dep_series(s: pd.Series) -> pd.Series:
     """Gère 201/202 -> 2A/2B et zéro-padding ailleurs (01, 02, ...)."""
     s = s.astype(str).str.strip().str.upper()
@@ -51,7 +50,7 @@ def _normalize_dep_series(s: pd.Series) -> pd.Series:
     s = s.where(s.isin(["2A", "2B"]), s.str.zfill(2))
     return s
 
-# --------------------- Lecture SQLite ---------------------
+
 def _load_dep_counts(db_file: Path, year: int = YEAR) -> pd.DataFrame:
     """Retourne dep, n (nb d'accidents) pour l'année donnée."""
     with sqlite3.connect(db_file) as conn:
@@ -65,7 +64,7 @@ def _load_dep_counts(db_file: Path, year: int = YEAR) -> pd.DataFrame:
     df["dep"] = _normalize_dep_series(df["dep"])
     return df
 
-# --------------------- Dropdown (noms + ordre imposé) ---------------------
+
 def _dropdown_options(geojson: dict, ordered_codes: list[str]) -> list[dict]:
     """
     Construit la liste déroulante STRICTEMENT dans l'ordre fourni.
@@ -77,7 +76,6 @@ def _dropdown_options(geojson: dict, ordered_codes: list[str]) -> list[dict]:
         nom = f["properties"].get("nom", "")
         if code:
             names[code] = nom
-    # Noms de secours
     names.setdefault("2A", "Corse-du-Sud")
     names.setdefault("2B", "Haute-Corse")
 
@@ -87,19 +85,18 @@ def _dropdown_options(geojson: dict, ordered_codes: list[str]) -> list[dict]:
         opts.append({"label": label, "value": code})
     return opts
 
-# --------------------- Layout ---------------------
+
 def infos_departement_layout(app: dash.Dash) -> dbc.Card:
     db_file = Path(DB_PATH)
     geojson = load_geojson_departments(Path(DEPT_GEOJSON))
 
-    # Comptages observés (SQLite)
-    counts = _load_dep_counts(db_file, YEAR)  # dep, n
+    counts = _load_dep_counts(db_file, YEAR) 
 
-    # Référentiels
-    codes96_list = _codes_metropole()   # liste ordonnée pour le dropdown (inclut 2A/2B)
-    codes101_set = set(_codes_101())    # pour le classement et la part (métropole + DOM)
 
-    # ---- Construire un DF complet /101 (pour rang et total) ----
+    codes96_list = _codes_metropole()   
+    codes101_set = set(_codes_101())  
+
+
     all_codes_sorted = sorted(codes101_set, key=lambda x: x.replace("A", "0A").replace("B", "0B"))
     all_codes_df = pd.DataFrame({"dep": all_codes_sorted})
     depc_all = all_codes_df.merge(counts, on="dep", how="left")
@@ -108,7 +105,7 @@ def infos_departement_layout(app: dash.Dash) -> dbc.Card:
     total_all = int(depc_all["n"].sum())
     nb_dep_all = 101
 
-    # ---- Intensité : bornes calculées sur la métropole (96) pour cohérence visuelle ----
+
     depc96 = depc_all[depc_all["dep"].isin(codes96_list)].copy()
     if not depc96.empty:
         q = depc96["n"].quantile([0.0, 0.2, 0.4, 0.6, 0.8, 1.0]).values
@@ -120,16 +117,15 @@ def infos_departement_layout(app: dash.Dash) -> dbc.Card:
         depc_all["n"], bins=q, labels=labels, include_lowest=True, duplicates="drop"
     )
 
-    # Rang (1 = le plus accidentogène) sur 101
     depc_all = depc_all.sort_values("n", ascending=False).reset_index(drop=True)
     depc_all["rang"] = depc_all["n"].rank(method="min", ascending=False).astype(int)
 
-    # Mémo pour callback
+
     app.server.depc_all = depc_all
     app.server.total_all = total_all
     app.server.nb_dep_all = nb_dep_all
 
-    # ---- Dropdown : uniquement métropole (96), ordre imposé, 2A/2B garantis ----
+
     dropdown = dcc.Dropdown(
         id="dep-info-dropdown",
         options=_dropdown_options(geojson, codes96_list),
@@ -137,10 +133,10 @@ def infos_departement_layout(app: dash.Dash) -> dbc.Card:
         clearable=False,
         searchable=True,
         style={"width": "100%"},
-        value="75",  # valeur par défaut simple
+        value="75", 
     )
 
-    # ---- Style des tuiles KPI ----
+
     kpi_style = {
         "display": "flex",
         "flexDirection": "column",
@@ -153,13 +149,9 @@ def infos_departement_layout(app: dash.Dash) -> dbc.Card:
         "border": "1px solid #eee",
     }
 
-    # ---- Bloc visuel ----
+
     content = dbc.Card(
         [
-            html.H5(
-                "Infos département (2024)",
-                style={"textAlign": "center", "color": "#2c3e50", "fontWeight": 600, "marginBottom": "10px"},
-            ),
             dbc.CardBody(
                 [
                     dropdown,
@@ -175,11 +167,11 @@ def infos_departement_layout(app: dash.Dash) -> dbc.Card:
                                     md=3,
                                 ),
                                 dbc.Col(
-                                    html.Div([html.Small("Part du total (/101)"), html.Div(id="kpi-part", className="fw-bold")], style=kpi_style),
+                                    html.Div([html.Small("Part du total"), html.Div(id="kpi-part", className="fw-bold")], style=kpi_style),
                                     md=3,
                                 ),
                                 dbc.Col(
-                                    html.Div([html.Small("Classement (/101)"), html.Div(id="kpi-rang", className="fw-bold")], style=kpi_style),
+                                    html.Div([html.Small("Classement"), html.Div(id="kpi-rang", className="fw-bold")], style=kpi_style),
                                     md=3,
                                 ),
                             ],
@@ -202,7 +194,7 @@ def infos_departement_layout(app: dash.Dash) -> dbc.Card:
         },
     )
 
-    # ---- Callback KPI ----
+
     @app.callback(
         Output("kpi-intensite", "children"),
         Output("kpi-nb", "children"),
@@ -216,7 +208,7 @@ def infos_departement_layout(app: dash.Dash) -> dbc.Card:
         total_all = app.server.total_all
         nb_dep_all = app.server.nb_dep_all
 
-        # Sélection de la ligne /101
+
         row = df_all.loc[df_all["dep"] == dep_code]
         if row.empty:
             return "—", "—", "—", f"— / {nb_dep_all}"

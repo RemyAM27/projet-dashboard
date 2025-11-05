@@ -1,15 +1,11 @@
-# src/pages/histogramme.py — final (niveau ESIEE)
 from __future__ import annotations
 import sqlite3
 from pathlib import Path
-from typing import List, Optional
-
 
 import pandas as pd
 import dash
 from dash import html, dcc, Input, Output
 import plotly.express as px
-
 
 try:
     from config import DB_PATH
@@ -17,9 +13,9 @@ try:
 except Exception:
     DB_FILE = Path("data/accidents.sqlite")
 
-YEAR = 2024  # année d'étude
+YEAR = 2024  
 
-# --------------------- Lecture base ---------------------
+
 def load_age_base(year: int = YEAR) -> pd.DataFrame:
     """
     Lit directement SQLite :
@@ -39,7 +35,7 @@ def load_age_base(year: int = YEAR) -> pd.DataFrame:
     with sqlite3.connect(DB_FILE) as conn:
         df = pd.read_sql_query(sql, conn, params=[year])
 
-    # calcul d'âge simple
+
     an_nais = pd.to_numeric(df.get("an_nais"), errors="coerce")
     age = year - an_nais
 
@@ -48,11 +44,11 @@ def load_age_base(year: int = YEAR) -> pd.DataFrame:
         "catu": pd.to_numeric(df.get("catu"), errors="coerce"),
         "grav": pd.to_numeric(df.get("grav"), errors="coerce"),
     })
-    # bornes plausibles d'âge
+
     out = out[(out["age"] >= 0) & (out["age"] <= 100)]
     return out.reset_index(drop=True)
 
-# --------------------- Préparation histogramme ---------------------
+
 def make_age_histogram(df: pd.DataFrame, min_age: int = 0) -> pd.DataFrame:
     ages = pd.to_numeric(df.get("age", pd.Series(dtype="float64")), errors="coerce")
     ages = ages[(ages >= min_age) & (ages <= 100)]
@@ -78,7 +74,7 @@ def build_hist_figure(df_hist: pd.DataFrame, y_label: str, hover_label: str):
                      rangemode="tozero", tickformat=",d")
     return fig
 
-# --------------------- Layout + Callback ---------------------
+
 def histogramme_layout(app: dash.Dash):
     base = load_age_base(YEAR)
     init = base[base["catu"] == 1] if "catu" in base.columns else base
@@ -88,8 +84,7 @@ def histogramme_layout(app: dash.Dash):
         dcc.Dropdown(
             id="hist-population",
             options=[
-                {"label": "Conducteurs uniquement", "value": "conducteurs"},
-                {"label": "Occupants de véhicules (conducteurs et passagers)", "value": "occupants"},
+                {"label": "Âge du conducteur", "value": "conducteurs"},
                 {"label": "Personnes décédées", "value": "decedes"},
             ],
             value="conducteurs",
@@ -106,13 +101,8 @@ def histogramme_layout(app: dash.Dash):
         style={"height": "440px"},
     )
 
-
     return html.Div(
         [
-            html.H4(
-                "Histogramme des accidents par âge",
-                style={"textAlign": "center", "color": "#2c3e50", "fontWeight": 600, "marginBottom": "10px"},
-            ),
             dropdown,
             html.Div(graph, style={"maxWidth": "1000px", "margin": "0 auto"}),
         ]
@@ -128,9 +118,6 @@ def update_histogram(pop: str):
 
     if pop == "conducteurs":
         df = df[df["catu"] == 1]
-        y_label, hover = "Nombre d'accidents", "accidents"
-    elif pop == "occupants":
-        df = df[df["catu"].isin([1, 2])]
         y_label, hover = "Nombre d'accidents", "accidents"
     elif pop == "decedes":
         df = df[df["grav"] == 2]

@@ -4,9 +4,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any, Iterable, Tuple
 import pandas as pd
 
-# ------------------------------------------------------------
-# Connexion SQLite robuste
-# ------------------------------------------------------------
+
 def connect(db_path: Path) -> sqlite3.Connection:
     """Connexion SQLite en lecture seule, compatible Windows."""
     p = Path(db_path).expanduser().resolve()
@@ -18,9 +16,7 @@ def connect(db_path: Path) -> sqlite3.Connection:
     return conn
 
 
-# ------------------------------------------------------------
-# Outils internes : lister et résoudre les tables
-# ------------------------------------------------------------
+
 def _list_tables(conn: sqlite3.Connection) -> list[str]:
     cur = conn.execute("""
         SELECT name FROM sqlite_master
@@ -62,9 +58,9 @@ def _resolve_table_names(conn: sqlite3.Connection) -> tuple[str, str]:
     return t_carac, t_lieux
 
 
-# ------------------------------------------------------------
+
 # Lecture simple d'une table
-# ------------------------------------------------------------
+
 def read_table(
     db_path: Path,
     table: str,
@@ -83,9 +79,9 @@ def read_table(
         return pd.read_sql(q, conn, params=params)
 
 
-# ------------------------------------------------------------
-# Lecture combinée caractéristiques + lieux (robuste)
-# ------------------------------------------------------------
+
+# Lecture combinée caractéristiques + lieux 
+
 def load_join_carac_lieux(db_path: Path, year: Optional[int] = None) -> pd.DataFrame:
     """Charge les données en aliasant dynamiquement les colonnes vers des noms standard.
        Joint 'lieux' uniquement si la colonne 'catr' existe EXACTEMENT et si on connaît la clé accident côté 'lieux'.
@@ -101,11 +97,9 @@ def load_join_carac_lieux(db_path: Path, year: Optional[int] = None) -> pd.DataF
         return None
 
     def pick_any(colnames: list[str], candidates: list[str]) -> Optional[str]:
-        # match exact insensible à la casse sur l'une des candidatures
         lowset = {c.lower() for c in colnames}
         for cand in candidates:
             if cand.lower() in lowset:
-                # renvoie le nom avec sa casse originale
                 for n in colnames:
                     if n.lower() == cand.lower():
                         return n
@@ -135,7 +129,7 @@ def load_join_carac_lieux(db_path: Path, year: Optional[int] = None) -> pd.DataF
                 f"Colonnes disponibles: {carac_cols}"
             )
 
-        # Côté lieux : on ne retient que des matches **EXACTS**
+        # Côté lieux 
         acc_lieux = pick_any(lieux_cols, ["num_acc", "Num_Acc"])
         catr_col  = pick_exact(lieux_cols, "catr")  # EXACTEMENT 'catr'
 
@@ -149,7 +143,7 @@ def load_join_carac_lieux(db_path: Path, year: Optional[int] = None) -> pd.DataF
             params["year"] = int(year)
         where_sql = ("WHERE " + " AND ".join(where)) if where else ""
 
-        # SELECT standardisé
+        #SELECT standardisé
         select_parts = [
             f'c."{acc_carac}"  AS "Num_Acc"',
             f'c."{year_col}"   AS "an"',
@@ -169,7 +163,6 @@ def load_join_carac_lieux(db_path: Path, year: Optional[int] = None) -> pd.DataF
                 {where_sql}
             '''
         else:
-            # Pas de colonne 'catr' EXACTE -> pas de jointure
             select_sql = ", ".join(select_parts)
             q = f'''
                 SELECT {select_sql}

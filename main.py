@@ -3,20 +3,18 @@ import sys
 import subprocess
 import sqlite3
 from pathlib import Path
-from functools import partial
 
 import dash
 from dash import html
 import dash_bootstrap_components as dbc
 
-from src.pages.carte_choroplethe import layout as carte_layout
-from src.pages.histogramme import histogramme_layout
-from src.pages.donut import donut_layout
-from src.pages.infos_departement import infos_departement_layout  # <-- nouveau
 
-# ==========================================================
-#        Préparation automatique des données au démarrage
-# ==========================================================
+from src.components.carte_choroplethe import layout as carte_layout
+from src.components.histogramme import histogramme_layout
+from src.components.donut import donut_layout
+from src.components.infos_departement import infos_departement_layout
+from src.components.graphiquecourbe import graphiquecourbe_layout
+
 
 ROOT = Path(__file__).resolve().parent
 DATA_DIR = ROOT / "data"
@@ -46,14 +44,13 @@ def _bind_db_env(db_path: Path) -> None:
 
 def ensure_data_ready() -> None:
     if _db_has_tables(DB_PATH) and SENTINEL.exists():
-        print("✅ Base déjà prête — aucune préparation nécessaire.")
         _bind_db_env(DB_PATH)
         return
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     utils_dir = ROOT / "src" / "utils"
 
-    print("⚙️  Préparation initiale des données en cours...\n")
+    print("Préparation initiale des données en cours...\n")
 
     _run([sys.executable, str(utils_dir / "get_data.py")])
     _run([sys.executable, str(utils_dir / "clean_data.py")])
@@ -72,7 +69,7 @@ def ensure_data_ready() -> None:
     )
 
     _bind_db_env(DB_PATH)
-    print("✅ Préparation terminée — la base SQLite est prête.\n")
+    print("Préparation terminée — la base SQLite est prête.\n")
 
 
 try:
@@ -83,150 +80,155 @@ except Exception as e:
     if DB_PATH.exists():
         _bind_db_env(DB_PATH)
 
-# ==========================================================
-#         Helpers spécifiques pour la courbe Jour/Nuit
-# ==========================================================
-
-def _detect_table_yearcol(conn: sqlite3.Connection) -> tuple[str, str | None]:
-    tables = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table';")]
-    preferred = ["caracteristiques", "accidents", "acc", "acc_caracteristiques"]
-    ordered = preferred + [t for t in tables if t not in preferred]
-
-    for t in ordered:
-        cols = {r[1].lower() for r in conn.execute(f"PRAGMA table_info('{t}');").fetchall()}
-        if {"mois", "lum"}.issubset(cols):
-            year_col = "an" if "an" in cols else ("annee" if "annee" in cols else ("year" if "year" in cols else None))
-            return t, year_col
-    raise RuntimeError("Aucune table avec colonnes 'mois' et 'lum' trouvée dans la base.")
 
 
-def _load_accidents_mois_lum(db_path: Path, year: int = 2024):
-    import pandas as pd
+CARD_STYLE = {
+    "backgroundColor": "#ffffff",
+    "border": "1px solid #e5e7eb",
+    "borderRadius": "12px",
+    "boxShadow": "0 2px 10px rgba(0,0,0,0.06)",
+    "padding": "12px",
+}
+
+TITLE_STYLE = {
+    "fontSize": "1.15rem",
+    "fontWeight": "600",
+    "color": "#1f2937",      
+    "marginBottom": "8px",
+}
+
+def _get_total_accidents_2024(db_path: Path) -> int:
+    """Compte le nombre total d'accidents (lignes) en 2024 dans la table caractéristiques."""
     with sqlite3.connect(db_path) as conn:
-        table, year_col = _detect_table_yearcol(conn)
+        tables = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table';")]
+        cand = "caracteristiques" if "caracteristiques" in tables else None
+        if cand is None:
+            for t in tables:
+                cols = {r[1].lower() for r in conn.execute(f"PRAGMA table_info('{t}')")}
+                if "num_acc" in cols and ("an" in cols or "annee" in cols or "year" in cols):
+                    cand = t
+                    break
+        if cand is None:
+            return 0
 
-        if year_col:
-            sql = f"SELECT mois, lum FROM {table} WHERE {year_col} = ?"
-            df = pd.read_sql_query(sql, conn, params=(year,))
-            if df.empty:
-                y = pd.read_sql_query(f"SELECT MAX({year_col}) AS y FROM {table}", conn)["y"].iat[0]
-                if pd.notna(y):
-                    df = pd.read_sql_query(sql, conn, params=(int(y),))
-        else:
-            df = pd.read_sql_query(f"SELECT mois, lum FROM {table}", conn)
+        cols = {r[1].lower() for r in conn.execute(f"PRAGMA table_info('{cand}')")}
+        ycol = "an" if "an" in cols else ("annee" if "annee" in cols else "year")
+        row = conn.execute(f"SELECT COUNT(*) FROM {cand} WHERE {ycol} = 2024").fetchone()
+        return int(row[0]) if row else 0
 
-    for col in ("mois", "lum"):
-        if col not in df.columns:
-            df[col] = None
-    df["mois"] = pd.to_numeric(df["mois"], errors="coerce").astype("Int64")
-    df["lum"] = pd.to_numeric(df["lum"], errors="coerce").astype("Int64")
-    df = df.dropna(subset=["mois", "lum"])
-    return df
 
-# On remplace la fonction utilisée dans la page 'graphiquecourbe'
-import src.pages.graphiquecourbe as courbe_page
-courbe_page.load_accidents = partial(_load_accidents_mois_lum, DB_PATH)
-graphiquecourbe_layout = courbe_page.graphiquecourbe_layout
+def _intro_paragraphs(total_2024: int) -> list:
+    """
+    Génère les paragraphes de présentation du dashboard (niveau professionnel).
+    """
+    txt = [
+        "Ce tableau de bord présente une analyse complète des accidents corporels de la route survenus en France en 2024, à partir des données officielles de la Sécurité routière.",
+        "L’objectif est de visualiser et de comprendre la répartition spatiale et temporelle des accidents, ainsi que les profils les plus concernés.",
+        "La carte illustre l’intensité des accidents par département, tandis que les graphiques mettent en évidence la répartition par âge des conducteurs, la gravité des victimes selon leur profil, et l’évolution mensuelle du nombre total d’accidents.",
+        f"En 2024, le jeu de données recense environ {total_2024:,} accidents corporels sur le territoire français.".replace(",", " "),
+    ]
+    return [html.P(t) for t in txt]
 
-# ==========================================================
-#                      Application Dash
-# ==========================================================
 
 external_stylesheets = [dbc.themes.BOOTSTRAP]
 app = dash.Dash(
     __name__,
     external_stylesheets=external_stylesheets,
     suppress_callback_exceptions=True,
+    meta_tags=[{"name": "viewport", "content": "width=device-width, initial-scale=1"}],
 )
-app.title = "Dashboard - Accidents (SQLite)"
+app.title = "Accidents de la route"
 
-app.layout = dbc.Container(
-    [
-        html.H3(
-            "Dashboard – Accidents de la route (2024)",
-            className="mt-3 mb-4 text-center",
-            style={"color": "#b91c1c"},
+
+
+total_2024 = _get_total_accidents_2024(DB_PATH)
+
+app.layout = dbc.Container(fluid=True, className="px-2", children=[
+    html.H3(
+        "Dashboard – Accidents de la route en France (2024)",
+        className="text-center my-2",
+        style={"color": "#b91c1c"}
+    ),
+
+    # À gauche : Intro / À droite : Infos département
+    dbc.Row(className="gx-2", children=[
+        dbc.Col(
+            dbc.Card(
+                dbc.CardBody([
+                    html.H5("À propos du dashboard", style=TITLE_STYLE),
+                    *(_intro_paragraphs(total_2024))
+                ]),
+                className="h-100 shadow-sm",
+                style=CARD_STYLE
+            ),
+            xs=12, md=12, lg=7, className="mb-2"
         ),
-
-        # Rangée 1 : colonne gauche (infos + carte) / colonne droite (histogramme + donut)
-        dbc.Row(
-            [
-                dbc.Col(
-                    html.Div(
-                        [
-                            infos_departement_layout(app),  # <-- panneau compact au-dessus de la carte
-                            carte_layout(app),
-                        ]
-                    ),
-                    width=8,
-                    style={"paddingRight": "10px"},
-                ),
-                dbc.Col(
-                    html.Div(
-                        [
-                            html.Div(
-                                histogramme_layout(app),
-                                style={
-                                    "backgroundColor": "#ffffff",
-                                    "border": "1px solid #e5e7eb",
-                                    "borderRadius": "12px",
-                                    "boxShadow": "0 2px 10px rgba(0,0,0,0.06)",
-                                    "padding": "10px",
-                                    "height": "fit-content",
-                                },
-                            ),
-                            html.Div(style={"height": "12px"}),
-                            html.Div(
-                                donut_layout(app),
-                                style={
-                                    "backgroundColor": "#ffffff",
-                                    "border": "1px solid #e5e7eb",
-                                    "borderRadius": "12px",
-                                    "boxShadow": "0 2px 10px rgba(0,0,0,0.06)",
-                                    "padding": "10px",
-                                    "height": "fit-content",
-                                },
-                            ),
-                        ]
-                    ),
-                    width=4,
-                ),
-            ],
-            justify="center",
-            align="start",
-            className="g-0",
+        dbc.Col(
+            dbc.Card(
+                dbc.CardBody([
+                    html.H5("Informations département", style=TITLE_STYLE),
+                    infos_departement_layout(app)
+                ]),
+                className="h-100 shadow-sm",
+                style=CARD_STYLE
+            ),
+            xs=12, md=12, lg=5, className="mb-2"
         ),
+    ]),
 
-        # Rangée 2 : courbe Jour/Nuit (pleine largeur)
-        dbc.Row(
-            [
-                dbc.Col(
-                    html.Div(
-                        graphiquecourbe_layout(app),
-                        style={
-                            "backgroundColor": "#ffffff",
-                            "border": "1px solid #e5e7eb",
-                            "borderRadius": "12px",
-                            "boxShadow": "0 2px 10px rgba(0,0,0,0.06)",
-                            "padding": "10px",
-                        },
-                    ),
-                    width=12,
-                )
-            ],
-            className="mt-3",
+    # Carte + Histogramme
+    dbc.Row(className="gx-2", children=[
+        dbc.Col(
+            dbc.Card(
+                dbc.CardBody([
+                    html.H5("Accidents de la route en France", style=TITLE_STYLE),
+                    html.Div(carte_layout(app), style={"minHeight": "48vh"})
+                ]),
+                className="h-100 shadow-sm",
+                style=CARD_STYLE
+            ),
+            xs=12, md=12, lg=8, className="mb-2"
         ),
+        dbc.Col(
+            dbc.Card(
+                dbc.CardBody([
+                    html.H5("Histogramme des accidents par âge", style=TITLE_STYLE),
+                    histogramme_layout(app)
+                ]),
+                className="h-100 shadow-sm",
+                style=CARD_STYLE
+            ),
+            xs=12, md=12, lg=4, className="mb-2"
+        ),
+    ]),
 
-        html.Br(),
-        html.Br(),
-    ],
-    fluid=True,
-)
+    #Donut + Courbe
+    dbc.Row(className="gx-2 pb-2", children=[
+        dbc.Col(
+            dbc.Card(
+                dbc.CardBody([
+                    html.H5("Gravité des victimes selon le profil", style=TITLE_STYLE),
+                    donut_layout(app)
+                ]),
+                className="h-100 shadow-sm",
+                style=CARD_STYLE
+            ),
+            xs=12, md=12, lg=5, className="mb-2"
+        ),
+        dbc.Col(
+            dbc.Card(
+                dbc.CardBody([
+                    html.H5("Nombre d'accidents par mois", style=TITLE_STYLE),
+                    graphiquecourbe_layout(app)
+                ]),
+                className="h-100 shadow-sm",
+                style=CARD_STYLE
+            ),
+            xs=12, md=12, lg=7, className="mb-2"
+        ),
+    ]),
+])
 
-# ==========================================================
-#                         Lancement
-# ==========================================================
+
 if __name__ == "__main__":
     app.run(debug=True)
-
-

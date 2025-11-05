@@ -71,8 +71,6 @@ def _figure(df: pd.DataFrame) -> go.Figure:
     return fig
 
 def donut_layout(app: dash.Dash) -> html.Div:
-    title = html.H4("Gravité des victimes selon le profil",
-                    style={"textAlign": "center", "color": "#2c3e50", "fontWeight": 600, "marginBottom": "10px"})
     dropdown = html.Div(
         dcc.Dropdown(
             id="donut-prof",
@@ -89,7 +87,7 @@ def donut_layout(app: dash.Dash) -> html.Div:
     graph = dcc.Graph(id="donut-graph",
                       figure=_figure(_read_counts(Path(DB_PATH), "conducteur")),
                       config={"displayModeBar": False}, style={"height": "420px"})
-    card = html.Div([title, dropdown, html.Div(graph, style={"maxWidth": "1100px", "margin": "0 auto"})],
+    card = html.Div([dropdown, html.Div(graph, style={"maxWidth": "1100px", "margin": "0 auto"})],
                     style={"background": "white", "border": "1px solid #e5e7eb", "borderRadius": "12px", "padding": "10px"})
     @app.callback(Output("donut-graph", "figure"), Input("donut-prof", "value"))
     def _update(v): return _figure(_read_counts(Path(DB_PATH), v))

@@ -1,4 +1,3 @@
-# clean_data.py
 # Script de nettoyage léger des CSV 2024 -> CSV nettoyés dans data/cleaned/
 # Usage :  python clean_data.py
 
@@ -54,7 +53,7 @@ def _clean_caract(df: pd.DataFrame) -> pd.DataFrame:
     df = _std_cols(df)
     df = _norm_num_acc(df)
 
-    # DEP (ex : 1 -> '01', 2A/2B laissés tels quels si déjà string)
+    
     if "dep" in df.columns:
         # on ne touche pas aux '2A/2B' déjà strings
         df["dep"] = df["dep"].astype(str).str.strip()
@@ -95,7 +94,7 @@ def _clean_vehicules(df: pd.DataFrame) -> pd.DataFrame:
     """Nettoyage léger des véhicules : standardisation colonnes + num_acc si présent."""
     df = _std_cols(df)
     df = _norm_num_acc(df)
-    # assurer présence d'un identifiant véhicule si existe avec noms variables
+    # assurer présence d'un identifiant véhicule si existe
     for cand in ("num_veh", "id_veh", "numveh"):
         if cand in df.columns:
             df["id_veh"] = df[cand].astype(str).str.strip()
@@ -120,11 +119,11 @@ def _clean_usagers(df: pd.DataFrame) -> pd.DataFrame:
         df["age"] = (2024 - an_nais).clip(lower=0, upper=110)
 
     if "grav" in df.columns:
-        # codes usuels : 1 Indemne, 2 Tué, 3 Blessé hospitalisé, 4 Blessé léger
+        #1 Indemne, 2 Tué, 3 Blessé hospitalisé, 4 Blessé léger
         mapping = {1: "Indemne", 2: "Tué", 3: "Hospitalisé", 4: "Léger"}
         df["grav_label"] = pd.to_numeric(df["grav"], errors="coerce").map(mapping)
 
-    # harmonise l'id véhicule si relié à la table véhicules
+    #Harmonise l'id véhicule si relié à la table véhicules
     for cand in ("id_veh", "num_veh", "numveh"):
         if cand in df.columns:
             df["id_veh"] = df[cand].astype(str).str.strip()
