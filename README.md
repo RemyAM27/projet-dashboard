@@ -42,12 +42,12 @@ projet-dashboard
 │   |-- geo
 |-- src                                         # le code source du dashboard
 |   |-- components                              # les composants du dashboard
-|   |   |-- __init__.py
-|   |   |-- component1.py
-|   |   |-- component2.py
-|   |   |-- footer.py
-|   |   |-- header.py
-|   |   |-- navbar.py
+|   |   |-- carte_choroplethe.py
+|   |   |-- donut.py
+|   |   |-- graphiquecourbe.py
+|   |   |-- histogramme.py
+|   |   |-- infos_departement.py
+|   |   |-- map_choropleth.py
 |   |-- utils                                   # les fonctions utilitaires
 |   |   |-- get_data.py                         # script de récupération des données
 |   |   |-- clean_data.py                       # script de nettoyage des données
