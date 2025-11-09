@@ -25,6 +25,38 @@ Les données utilisées proviennent de la page :
 
 Pour ce projet, nous nous sommes concentrés sur le jeu de données de l'année 2024.
 
+Voici un aperçu de la structure du code du projet :
+
+```
+projet-dashboard
+|-- .gitignore
+|-- .venv
+|   |-- *
+|-- config.py                                   # fichier de configuration
+|-- main.py                                     # fichier principal permettant de lancer le dashboard
+|-- requirements.txt                            # liste des packages additionnels requis
+|-- README.md
+|-- data                                        # les données
+│   |-- cleaned
+│   |-- raw
+│   |-- geo
+|-- src                                         # le code source du dashboard
+|   |-- components                              # les composants du dashboard
+|   |   |-- __init__.py
+|   |   |-- component1.py
+|   |   |-- component2.py
+|   |   |-- footer.py
+|   |   |-- header.py
+|   |   |-- navbar.py
+|   |-- utils                                   # les fonctions utilitaires
+|   |   |-- get_data.py                         # script de récupération des données
+|   |   |-- clean_data.py                       # script de nettoyage des données
+|   |   |-- data_utils.py                      
+|   |   |-- sqlite_utils.py                     
+|   |   |-- to_sqlite.py                        # script de conversion des CSV en SQLite
+|-- video.mp4
+
+```
 ## User Guide
 
 Suivez ces étapes pour lancer le projet en local :
