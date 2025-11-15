@@ -101,7 +101,7 @@ Suivez ces étapes pour lancer le projet en local :
 
 3. **Ajouter un callback** :
    - Si votre graphique nécessite une interaction utilisateur, créez un callback dans le fichier correspondant pour connecter les entrées et les sorties des composants interactifs.
-   - 
+
 ## Rapport d'analyse et Conclusions
 
 Ce tableau de bord permet de dégager plusieurs tendances et conclusions claires concernant l'accidentologie en France :

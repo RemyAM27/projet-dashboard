@@ -17,7 +17,7 @@ MAP_BLOCK_H = "72vh"
 # Centre initial de la carte sur la France
 FR_CENTER = {"lat": 46.4, "lon": 2.0}
 # Niveau de zoom initial pour la carte
-MAP_INIT_ZOOM = 4.5
+MAP_INIT_ZOOM = 4.3
 
 
 # Fonction pour formater les nombres avec des espaces comme séparateurs de milliers
@@ -110,11 +110,11 @@ def layout(app: dash.Dash):
     side_panel = html.Div(
         [
             html.Div("   Echelle d’intensité", style={"textAlign": "center", "fontWeight": 600, "marginBottom": "8px"}),
-            _legend_row(BASE_COLOR_MAP["Très faible"], f"Très faible (≤ {_fmt(b1)})"),
-            _legend_row(BASE_COLOR_MAP["Faible"], f"Faible ({_fmt(b1)} – {_fmt(b2)})"),
-            _legend_row(BASE_COLOR_MAP["Moyen"], f"Moyen ({_fmt(b2)} – {_fmt(b3)})"),
-            _legend_row(BASE_COLOR_MAP["Élevé"], f"Élevé ({_fmt(b3)} – {_fmt(b4)})"),
-            _legend_row(BASE_COLOR_MAP["Très élevé"], f"Très élevé (> {_fmt(b4)})"),
+            _legend_row(BASE_COLOR_MAP["Très faible"], f"Très faible (≤ {_fmt(b1)} accidents)"),
+            _legend_row(BASE_COLOR_MAP["Faible"], f"Faible ({_fmt(b1)} – {_fmt(b2)} accidents)"),
+            _legend_row(BASE_COLOR_MAP["Moyen"], f"Moyen ({_fmt(b2)} – {_fmt(b3)} accidents)"),
+            _legend_row(BASE_COLOR_MAP["Élevé"], f"Élevé ({_fmt(b3)} – {_fmt(b4)} accidents)"),
+            _legend_row(BASE_COLOR_MAP["Très élevé"], f"Très élevé (> {_fmt(b4)} accidents)"),
 
             # Section pour filtrer par intensité
             html.Div("Filtrer par intensité", style={"textAlign": "center", "marginTop": "14px", "marginBottom": "8px", "fontWeight": 600}),

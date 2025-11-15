@@ -122,10 +122,10 @@ def _intro_paragraphs(total_2024: int) -> list:
     Génère les paragraphes de présentation du dashboard (niveau professionnel).
     """
     txt = [
-        "Ce tableau de bord présente une analyse complète des accidents corporels de la route survenus en France en 2024, à partir des données officielles de la Sécurité routière.",
+        "Ce tableau de bord présente une analyse complète des accidents de la route survenus en France en 2024, à partir des données officielles de la Sécurité routière.",
         "L’objectif est de visualiser et de comprendre la répartition spatiale et temporelle des accidents, ainsi que les profils les plus concernés.",
         "La carte illustre l’intensité des accidents par département, tandis que les graphiques mettent en évidence la répartition par âge des conducteurs, la gravité des victimes selon leur profil, et l’évolution mensuelle du nombre total d’accidents.",
-        f"En 2024, le jeu de données recense environ {total_2024:,} accidents corporels sur le territoire français.".replace(",", " "),
+        f"Le jeu de données recense environ {total_2024:,} accidents corporels sur le territoire français en 2024.".replace(",", " "),
     ]
     return [html.P(t) for t in txt]
 
@@ -166,7 +166,7 @@ app.layout = dbc.Container(fluid=True, className="px-2", children=[
         dbc.Col(
             dbc.Card(
                 dbc.CardBody([
-                    html.H5("Informations département", style=TITLE_STYLE),
+                    html.H5("Informations par département", style=TITLE_STYLE),
                     infos_departement_layout(app)
                 ]),
                 className="h-100 shadow-sm",
